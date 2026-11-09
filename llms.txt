@@ -1,0 +1,24 @@
+# SDK Release Kit
+
+> Local tool and MCP server for mobile SDK teams. It builds demo apps and SDK packages from Android (Gradle), iOS (Xcode), Flutter and React Native checkouts using YAML recipes, then publishes them to a synced shared folder (OneDrive or similar), Google Play internal testing and TestFlight. Configured per machine through a localhost Settings UI; secrets live in the OS keychain or environment, never in files.
+
+Install: `pip install sdk-release-kit` (or run without installing: `uvx sdk-release-kit --help`).
+MCP server (stdio): `uvx sdk-release-kit mcp`. Tools: get_status, list_recipes, plan_build, run_build, list_runs, get_run_report, set_repo_path.
+CLI: `sdk-release-kit init`, `serve`, `build --sdks <ids> --artifacts demos|packages|both --dest onedrive,play,testflight [--dry-run] [--skip-upload]`, `recipes`, `status`, `keys set <name>`.
+
+## Docs
+
+- [README](https://github.com/yehyatt/sdk-release-kit/blob/main/README.md): install, configuration layers, destinations, recipes, security model, MCP setup
+- [AGENTS.md](https://github.com/yehyatt/sdk-release-kit/blob/main/AGENTS.md): rules and extension points for AI agents changing the code
+- [Recipes](https://github.com/yehyatt/sdk-release-kit/blob/main/recipes/sdks.yaml): the shipped recipes and step types
+
+## Examples
+
+- [repos.example.yaml](https://github.com/yehyatt/sdk-release-kit/blob/main/examples/repos.example.yaml): recipe id to checkout path, tool locations
+- [outputs.example.yaml](https://github.com/yehyatt/sdk-release-kit/blob/main/examples/outputs.example.yaml): staging, shared folder, Play, TestFlight options
+- [keys.example.yaml](https://github.com/yehyatt/sdk-release-kit/blob/main/examples/keys.example.yaml): key file paths and secret references
+- [custom.example.yaml](https://github.com/yehyatt/sdk-release-kit/blob/main/examples/custom.example.yaml): team identifiers read by recipes
+
+## Optional
+
+- [Source](https://github.com/yehyatt/sdk-release-kit/tree/main/src/sdk_release_kit): pipeline.py (orchestration), builders/ (step handlers), uploaders/ (destinations), mcp_server.py

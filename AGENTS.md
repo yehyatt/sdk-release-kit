@@ -34,6 +34,9 @@ Guidance for AI coding agents (and humans) changing this repository.
 | `src/sdk_release_kit/pipeline.py` | Select, build, publish, report |
 | `src/sdk_release_kit/server.py` | Settings UI API (FastAPI) |
 | `src/sdk_release_kit/cli.py` | Typer CLI |
+| `src/sdk_release_kit/mcp_server.py` | MCP server for agents (`sdk-release-kit mcp`); never return secret values |
+| `plugins/sdk-release-kit/` | Claude Code plugin (MCP config + `release-sdks` skill); `.claude-plugin/marketplace.json` lists it |
+| `server.json`, `context7.json`, `llms.txt` | MCP Registry, Context7 and LLM discovery metadata; keep versions in sync with `pyproject.toml` |
 | `web/` | Static Settings UI (plain HTML, CSS, JS; no build step) |
 
 ## Common changes

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "sdk-release-kit": {
+      "command": "uvx",
+      "args": ["sdk-release-kit", "mcp"]
+    }
+  }
+}

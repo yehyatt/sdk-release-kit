@@ -73,6 +73,14 @@ def serve(
 
 
 @app.command()
+def mcp() -> None:
+    """Run the MCP server on stdio, for AI agents (Claude, Cursor, Copilot and others)."""
+    from .mcp_server import run as run_mcp
+
+    run_mcp()
+
+
+@app.command()
 def recipes() -> None:
     """List recipe ids and where recipes were loaded from."""
     try:

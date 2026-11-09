@@ -8,9 +8,22 @@ works on every developer's Mac without editing scripts.
 Supports Android (Gradle), iOS (Xcode), Flutter and React Native SDKs out of the box. New
 SDKs are added in a YAML recipe file, usually without code changes.
 
+AI agents can drive it too: it ships an [MCP server](#use-with-ai-agents) and a Claude Code
+plugin.
+
+<!-- mcp-name: io.github.yehyatt/sdk-release-kit -->
+
 ## Install
 
 Python 3.11 or newer.
+
+```bash
+pip install sdk-release-kit    # or run without installing: uvx sdk-release-kit --help
+sdk-release-kit init
+sdk-release-kit serve
+```
+
+From source:
 
 ```bash
 git clone https://github.com/yehyatt/sdk-release-kit.git
@@ -27,6 +40,50 @@ Fill in **Repositories**, **Outputs** and **Keys** in the UI, then:
 sdk-release-kit build --sdks flutter,android-current --artifacts both --dest onedrive
 ```
 
+## Use with AI agents
+
+`sdk-release-kit mcp` runs an MCP server on stdio. Its tools:
+
+| Tool | Does |
+| --- | --- |
+| `get_status` | Checkouts, key status (configured or missing, never values), destination readiness, tools on PATH |
+| `list_recipes` | Recipe ids, steps, store flags and checkout per recipe |
+| `plan_build` | Dry run: exact commands, collected files, ready or skipped destinations |
+| `run_build` | Build and publish; returns the run report and the end of the log |
+| `list_runs`, `get_run_report` | Previous runs and their reports |
+| `set_repo_path` | Point a recipe at a local checkout |
+
+**Claude Code plugin** (MCP server plus a `release-sdks` skill):
+
+```
+/plugin install sdk-release-kit --marketplace yehyatt/sdk-release-kit
+```
+
+On older Claude Code versions: `/plugin marketplace add yehyatt/sdk-release-kit`, then
+`/plugin install sdk-release-kit@sdk-release-kit`.
+
+**Claude Code, MCP only:**
+
+```bash
+claude mcp add sdk-release-kit -- uvx sdk-release-kit mcp
+```
+
+**Claude Desktop, Cursor, Windsurf, VS Code and other MCP clients:**
+
+```json
+{
+  "mcpServers": {
+    "sdk-release-kit": { "command": "uvx", "args": ["sdk-release-kit", "mcp"] }
+  }
+}
+```
+
+The server never returns secret values, and keys are still entered through the Settings UI.
+Agents are told to plan before building and to confirm before uploading to Play or TestFlight.
+Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as
+`io.github.yehyatt/sdk-release-kit`. A summary for language models is in
+[llms.txt](https://github.com/yehyatt/sdk-release-kit/blob/main/llms.txt).
+
 ## Commands
 
 | Command | What it does |
@@ -38,6 +95,7 @@ sdk-release-kit build --sdks flutter,android-current --artifacts both --dest one
 | `sdk-release-kit recipes` | List recipe ids and where they were loaded from |
 | `sdk-release-kit status` | Settings files, key status (never values), installed tools |
 | `sdk-release-kit keys set <name>` | Store a secret in the OS keychain (prompted, not echoed) |
+| `sdk-release-kit mcp` | MCP server on stdio for AI agents |
 
 `build` options:
 
@@ -211,9 +269,9 @@ runs to speed up rebuilds.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). AI coding agents should read [AGENTS.md](AGENTS.md)
+See [CONTRIBUTING.md](https://github.com/yehyatt/sdk-release-kit/blob/main/CONTRIBUTING.md). AI coding agents should read [AGENTS.md](https://github.com/yehyatt/sdk-release-kit/blob/main/AGENTS.md)
 first.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/yehyatt/sdk-release-kit/blob/main/LICENSE).

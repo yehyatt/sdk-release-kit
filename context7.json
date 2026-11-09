@@ -1,0 +1,16 @@
+{
+  "$schema": "https://context7.com/schema/context7.json",
+  "projectTitle": "SDK Release Kit",
+  "description": "Local tool and MCP server that builds mobile SDK demo apps and SDK packages (Android Gradle, iOS Xcode, Flutter, React Native) from YAML recipes and publishes them to a synced shared folder, Google Play internal testing and TestFlight.",
+  "folders": [],
+  "excludeFolders": ["web", "tests", ".venv", "dist"],
+  "excludeFiles": ["CLAUDE.md"],
+  "rules": [
+    "Recipes in recipes/sdks.yaml use paths relative to the SDK checkout; absolute paths go only in user settings (~/.config/sdk-release-kit/).",
+    "Never put passwords or tokens in YAML; keys.yaml holds file paths and SecretRef entries ({source: keychain|env, name}).",
+    "Put team-specific identifiers (bundle ids, Apple team id) in custom.yaml and reference them in recipes as ${custom.key:-default}.",
+    "Run `sdk-release-kit build --dry-run` (or the plan_build MCP tool) before a real build.",
+    "Add a new SDK by adding a recipe with existing step types (run, gradle, flutter, xcode-simulator, xcode-ipa, xcframework, npm-pack, source-zip); no code change needed.",
+    "Store uploads soft-skip when credentials are missing; a run only fails on build errors or failed uploads."
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "sdk-release-kit",
+  "version": "0.2.0",
+  "description": "Build Android, iOS, Flutter and React Native SDK demo apps and packages and publish them to a shared folder, Google Play internal testing and TestFlight.",
+  "author": {
+    "name": "Yahya",
+    "url": "https://github.com/yehyatt"
+  },
+  "homepage": "https://github.com/yehyatt/sdk-release-kit",
+  "repository": "https://github.com/yehyatt/sdk-release-kit",
+  "license": "MIT",
+  "keywords": ["mobile", "sdk", "release", "testflight", "google-play"]
+}

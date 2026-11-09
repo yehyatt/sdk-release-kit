@@ -1,0 +1,20 @@
+{
+  "name": "sdk-release-kit",
+  "owner": {
+    "name": "Yahya",
+    "url": "https://github.com/yehyatt"
+  },
+  "metadata": {
+    "description": "Build and ship mobile SDK demo apps and packages from Claude Code."
+  },
+  "plugins": [
+    {
+      "name": "sdk-release-kit",
+      "source": "./plugins/sdk-release-kit",
+      "description": "MCP server and skill to build Android, iOS, Flutter and React Native SDK demos and packages and publish them to a shared folder, Google Play internal testing and TestFlight.",
+      "version": "0.2.0",
+      "category": "development",
+      "keywords": ["mobile", "sdk", "release", "android", "ios", "flutter", "react-native", "testflight", "google-play"]
+    }
+  ]
+}

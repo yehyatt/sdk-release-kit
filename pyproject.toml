@@ -4,13 +4,14 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sdk-release-kit"
-version = "0.1.0"
+version = "0.2.0"
 description = "Build mobile SDK demo apps and packages, then publish them to a shared folder, Google Play internal testing and TestFlight."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.11"
-keywords = ["android", "ios", "flutter", "react-native", "sdk", "release", "testflight", "google-play"]
+authors = [{ name = "Yahya" }]
+keywords = ["android", "ios", "flutter", "react-native", "sdk", "release", "testflight", "google-play", "mcp", "mcp-server", "ai-agents"]
 classifiers = [
   "Programming Language :: Python :: 3",
   "Operating System :: MacOS",
@@ -23,7 +24,13 @@ dependencies = [
   "pydantic>=2.6",
   "PyYAML>=6.0",
   "keyring>=24",
+  "mcp>=2.3,<3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/yehyatt/sdk-release-kit"
+Repository = "https://github.com/yehyatt/sdk-release-kit"
+Issues = "https://github.com/yehyatt/sdk-release-kit/issues"
 
 [project.optional-dependencies]
 play = ["google-api-python-client>=2.100", "google-auth>=2.25"]
