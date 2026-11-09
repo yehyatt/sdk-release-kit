@@ -9,11 +9,13 @@ Compatibility rules:
 
 from __future__ import annotations
 
+import re
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SCHEMA_VERSION = 1
+SAFE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
 
 Destination = Literal["onedrive", "play", "testflight"]
 DESTINATIONS: tuple[str, ...] = ("onedrive", "play", "testflight")
@@ -158,6 +160,14 @@ class Collect(_Recipe):
     )
     required: bool = True
 
+    @field_validator("glob")
+    @classmethod
+    def _relative_glob(cls, value: str) -> str:
+        parts = value.replace("\\", "/").split("/")
+        if value.startswith(("/", "~")) or ".." in parts:
+            raise ValueError(f"collect glob must stay inside its root: {value!r}")
+        return value
+
 
 class _StepBase(_Recipe):
     name: str | None = None
@@ -283,15 +293,31 @@ class Recipe(_Recipe):
 
 class OneDriveTarget(_Recipe):
     folder: str = Field(
-        description="demos_android, demos_ios or packages (keys of outputs.onedrive)."
+        pattern=r"^[A-Za-z_][A-Za-z0-9_]*$",
+        description="demos_android, demos_ios or packages (keys of outputs.onedrive).",
     )
     name: str
+
+    @field_validator("name")
+    @classmethod
+    def _plain_name(cls, value: str) -> str:
+        if not SAFE_ID.match(value):
+            raise ValueError(f"target name must be a plain file name: {value!r}")
+        return value
 
 
 class RecipesFile(_Recipe):
     schema_version: int = SCHEMA_VERSION
     onedrive_targets: dict[str, OneDriveTarget] = Field(default_factory=dict)
     recipes: dict[str, Recipe] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _safe_ids(self) -> RecipesFile:
+        for kind, ids in (("recipe", self.recipes), ("onedrive target", self.onedrive_targets)):
+            for key in ids:
+                if not SAFE_ID.match(key):
+                    raise ValueError(f"{kind} id must use letters, digits, '.', '_', '-': {key!r}")
+        return self
 
     @model_validator(mode="after")
     def _targets_exist(self) -> RecipesFile:

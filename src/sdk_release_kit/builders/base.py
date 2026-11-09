@@ -183,7 +183,11 @@ def execute_step(ctx: BuildContext, step: Any, stage: str) -> list[Artifact]:
         root = roots.get(spec.root)
         if root is None:
             raise StepError(f"collect root '{spec.root}' is not available for {step.type} steps")
+        root_resolved = root.resolve()
         matches = sorted(p for p in root.glob(spec.glob) if p.exists())
+        escaped = [m for m in matches if root_resolved not in m.resolve().parents]
+        if escaped:
+            raise StepError(f"'{spec.glob}' matched files outside {root}: {escaped[0]}")
         if not matches and spec.required:
             raise StepError(f"no files matched '{spec.glob}' under {root}")
         produced += [Produced(m, spec.kind, spec.target) for m in matches]

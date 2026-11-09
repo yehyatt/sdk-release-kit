@@ -15,7 +15,7 @@ from pathlib import Path
 
 from ..builders import Artifact
 from ..models import OutputsSettings, RecipesFile
-from ..paths import expand
+from ..paths import expand, safe_join
 from ..runlog import RunLog
 from . import UploadResult
 
@@ -71,32 +71,37 @@ def publish(
     log: RunLog,
     meta: dict[str, str],
 ) -> list[UploadResult]:
-    root = expand(outputs.onedrive.root)
-    assert root is not None
+    root_path = expand(outputs.onedrive.root)
+    assert root_path is not None
+    root = root_path.resolve()
     results: list[UploadResult] = []
 
     for art in (a for a in artifacts if a.stage == "demos"):
-        if art.target:
-            target = recipes.onedrive_targets[art.target]
-            dest = root / _subfolder(outputs, target.folder) / target.name
-        elif outputs.onedrive.copy_untargeted and art.kind in DEMO_FOLDER_BY_KIND:
-            folder = _subfolder(outputs, DEMO_FOLDER_BY_KIND[art.kind])
-            dest = root / folder / art.recipe / art.path.name
-        else:
-            continue
         try:
+            if art.target:
+                target = recipes.onedrive_targets[art.target]
+                dest = safe_join(root, f"{_subfolder(outputs, target.folder)}/{target.name}")
+            elif outputs.onedrive.copy_untargeted and art.kind in DEMO_FOLDER_BY_KIND:
+                folder = _subfolder(outputs, DEMO_FOLDER_BY_KIND[art.kind])
+                dest = safe_join(root, f"{folder}/{art.recipe}/{art.path.name}")
+            else:
+                continue
             _place(art.path, dest)
             log.info(f"onedrive: {art.path.name} -> {dest.relative_to(root)}")
             results.append(UploadResult("onedrive", art.path.name, "ok", location=str(dest)))
-        except OSError as exc:
+        except (OSError, ValueError) as exc:
             results.append(UploadResult("onedrive", art.path.name, "failed", str(exc)))
 
     packages = [a for a in artifacts if a.stage == "packages"]
     for recipe_id in sorted({a.recipe for a in packages}):
         items = [a for a in packages if a.recipe == recipe_id]
         version = items[0].version
-        recipe_dir = root / _subfolder(outputs, "packages") / recipe_id
-        version_dir = recipe_dir / version
+        try:
+            recipe_dir = safe_join(root, f"{_subfolder(outputs, 'packages')}/{recipe_id}")
+            version_dir = recipe_dir / version  # sanitised in pipeline.resolve_version
+        except ValueError as exc:
+            results += [UploadResult("onedrive", a.path.name, "failed", str(exc)) for a in items]
+            continue
         placed = []
         for art in items:
             try:

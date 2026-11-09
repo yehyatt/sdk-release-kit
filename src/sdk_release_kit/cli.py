@@ -72,6 +72,49 @@ def serve(
     run_server(host=host, port=port, open_browser=not no_browser)
 
 
+@app.command("open")
+def open_ui(
+    port: int = typer.Option(8765, help="Preferred port if a new server is started."),
+    print_only: bool = typer.Option(False, "--print", help="Print the sign-in URL only."),
+) -> None:
+    """Open the Settings UI, starting it in the background if needed (easiest way in)."""
+    import webbrowser
+
+    from . import launcher
+
+    state = launcher.running()
+    if state is None:
+        typer.echo("starting the Settings UI in the background...")
+        try:
+            state = launcher.start_background(port)
+        except RuntimeError as exc:
+            typer.echo(str(exc), err=True)
+            raise typer.Exit(1) from exc
+    url = launcher.sign_in_url(state)
+    p = state["port"]
+    if launcher.is_ssh_session() or print_only:
+        typer.echo(f"Settings UI is running on this Mac at port {p}.")
+        if launcher.is_ssh_session():
+            typer.echo(
+                "You are on SSH, so open it from your own device through a port forward:\n"
+                f"  ssh -L {p}:127.0.0.1:{p} <this-mac>\n"
+                f"  Termius: Port Forwarding > New > Local, port {p} to 127.0.0.1:{p}\n"
+                "Then open this link on that device:"
+            )
+        typer.echo(url)
+        return
+    webbrowser.open(url)
+    typer.echo(f"opened {url.split('?')[0]} (run 'sdk-release-kit stop' to shut it down)")
+
+
+@app.command()
+def stop() -> None:
+    """Stop a Settings UI started with 'open'."""
+    from . import launcher
+
+    typer.echo("stopped" if launcher.stop() else "no Settings UI running")
+
+
 @app.command()
 def mcp() -> None:
     """Run the MCP server on stdio, for AI agents (Claude, Cursor, Copilot and others)."""

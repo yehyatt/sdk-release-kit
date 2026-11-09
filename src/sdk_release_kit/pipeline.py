@@ -87,7 +87,8 @@ def resolve_version(recipe: Recipe, repo: Path) -> str:
             value = None
     value = value or _git(repo, "describe", "--tags", "--always", "--dirty")
     value = value or time.strftime("dev-%Y%m%d-%H%M")
-    return re.sub(r"[^A-Za-z0-9._+-]+", "-", value).strip("-") or "unknown"
+    # A plain folder name: no separators, no leading dots (so never "." or "..").
+    return re.sub(r"[^A-Za-z0-9._+-]+", "-", value).strip("-.") or "unknown"
 
 
 class Pipeline:
@@ -275,8 +276,10 @@ class Pipeline:
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
             for art in items:
                 if art.path.is_dir():
+                    root = art.path.resolve()
                     for f in sorted(art.path.rglob("*")):
-                        if f.is_file():
+                        # Keep internal framework symlinks; drop links pointing outside.
+                        if f.is_file() and root in f.resolve().parents:
                             zf.write(f, f"{art.path.name}/{f.relative_to(art.path).as_posix()}")
                 else:
                     zf.write(art.path, art.path.name)

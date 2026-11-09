@@ -25,10 +25,20 @@ def dump(data: Any) -> str:
     return yaml.safe_dump(data, sort_keys=False, allow_unicode=True, default_flow_style=False)
 
 
+def _is_own_dir(folder: Path) -> bool:
+    """True for the settings directory or folders inside it. Never touch other folders'
+    permissions (a settings file may be pointed elsewhere with an env override)."""
+    from ..paths import user_home
+
+    home = user_home().resolve()
+    target = folder.resolve()
+    return target == home or home in target.parents
+
+
 def write_text_atomic(path: Path, text: str, private: bool = True) -> None:
     """Write via a temp file and rename. Settings files are user-only (mode 600)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    if private:
+    if private and _is_own_dir(path.parent):
         os.chmod(path.parent, 0o700)
     fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.")
     try:

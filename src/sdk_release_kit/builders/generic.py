@@ -17,6 +17,29 @@ def run_step(ctx: BuildContext, step: RunStep, cwd: Path) -> StepPlan:
     return StepPlan(commands=[Command(argv, cwd)])
 
 
+# Never packaged by the files method, whatever the recipe says.
+SECRET_PATTERNS = [
+    ".env",
+    ".env.*",
+    "*.jks",
+    "*.keystore",
+    "*.p8",
+    "*.p12",
+    "*.pem",
+    "*.key",
+    "*.mobileprovision",
+    "key.properties",
+    "*signing*.properties",
+    "local.properties",
+    "*service-account*.json",
+    "*adminsdk*.json",
+    "client_secret*.json",
+    "GoogleService-Info.plist",
+    "google-services.json",
+    "*.xcconfig.local",
+]
+
+
 def _excluded(rel: Path, patterns: list[str]) -> bool:
     return any(fnmatch.fnmatch(part, pat) for part in rel.parts for pat in patterns)
 
@@ -46,11 +69,26 @@ def source_zip(ctx: BuildContext, step: SourceZipStep, cwd: Path) -> StepPlan:
     def build_zip() -> list[Produced]:
         prepare()
         with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as zf:
+            skipped = 0
             for path in sorted(cwd.rglob("*")):
                 rel = path.relative_to(cwd)
-                if path.is_file() and not _excluded(rel, step.exclude):
+                if _excluded(rel, step.exclude):
+                    continue
+                # Symlinks (often gitignored links into a secrets folder) and anything shaped
+                # like a credential are never packaged.
+                if path.is_symlink() or any(
+                    p.is_symlink() for p in path.parents if cwd in p.parents
+                ):
+                    skipped += 1
+                    continue
+                if path.is_file():
+                    if _excluded(rel, SECRET_PATTERNS):
+                        skipped += 1
+                        continue
                     zf.write(path, prefix + rel.as_posix())
         ctx.log.info(f"zipped sources into {out.name}")
+        if skipped:
+            ctx.log.info(f"left out {skipped} symlink(s) or credential-shaped file(s)")
         return [Produced(out, "zip")]
 
     return StepPlan(finish=build_zip, notes=[f"zip files under {cwd} excluding {step.exclude}"])

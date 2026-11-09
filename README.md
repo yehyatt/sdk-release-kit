@@ -20,7 +20,7 @@ Python 3.11 or newer.
 ```bash
 pip install sdk-release-kit    # or run without installing: uvx sdk-release-kit --help
 sdk-release-kit init
-sdk-release-kit serve
+sdk-release-kit open
 ```
 
 From source:
@@ -31,8 +31,16 @@ cd sdk-release-kit
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .            # add '.[play]' for direct Google Play API uploads
 sdk-release-kit init        # creates your settings from examples/
-sdk-release-kit serve       # opens the Settings UI on http://127.0.0.1:8765
+sdk-release-kit open        # starts the Settings UI if needed and opens it signed in
 ```
+
+`sdk-release-kit open` is the easy way in, every time: it reuses a running Settings UI or
+starts one in the background, then opens your browser already signed in.
+`sdk-release-kit stop` shuts it down.
+
+**Over SSH** (for example from a phone), `open` prints a sign-in link instead. Forward the
+port from your client first: `ssh -L 8765:127.0.0.1:8765 <your-mac>`, or in Termius add a
+Local port forward from 8765 to 127.0.0.1:8765. Then open the printed link on your device.
 
 Fill in **Repositories**, **Outputs** and **Keys** in the UI, then:
 
@@ -79,7 +87,9 @@ claude mcp add sdk-release-kit -- uvx sdk-release-kit mcp
 ```
 
 The server never returns secret values, and keys are still entered through the Settings UI.
-Agents are told to plan before building and to confirm before uploading to Play or TestFlight.
+Agents are told to plan before building. `run_build` publishes only to the shared folder
+unless the agent passes `play` or `testflight` together with `allow_store_uploads=true`, which
+the skill reserves for an explicit request from you.
 Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as
 `io.github.yehyatt/sdk-release-kit`. A summary for language models is in
 [llms.txt](https://github.com/yehyatt/sdk-release-kit/blob/main/llms.txt).
@@ -89,7 +99,9 @@ Listed in the [MCP Registry](https://registry.modelcontextprotocol.io) as
 | Command | What it does |
 | --- | --- |
 | `sdk-release-kit init [--force]` | Copy `examples/*.example.yaml` into your settings directory |
-| `sdk-release-kit serve` | Settings UI (Repositories, Outputs, Keys, Custom data, Run) |
+| `sdk-release-kit open [--print]` | Open the Settings UI signed in, starting it in the background if needed |
+| `sdk-release-kit stop` | Stop the background Settings UI |
+| `sdk-release-kit serve` | Run the Settings UI in the foreground |
 | `sdk-release-kit build ...` | Build and publish (see options below) |
 | `sdk-release-kit build --dry-run` | Print the plan: commands, collected files, destinations |
 | `sdk-release-kit recipes` | List recipe ids and where they were loaded from |
@@ -178,7 +190,7 @@ The shipped recipes use placeholder names. Do these three things before your fir
 1. Clone the repository and `pip install -e .` on the new machine.
 2. `sdk-release-kit init`, or copy your `<settings>` directory from another machine and fix
    the absolute paths.
-3. Open `sdk-release-kit serve` and check that every repository shows a green check and every
+3. Run `sdk-release-kit open` and check that every repository shows a green check and every
    key shows "configured".
 4. Run `sdk-release-kit build --dry-run` before the first real build.
 
@@ -233,7 +245,7 @@ recipes:
 | `xcode-ipa` | Archive and export an IPA (App Store Connect key used for automatic signing when set) |
 | `xcframework` | Device and simulator archives combined into a zipped XCFramework |
 | `npm-pack` | `npm pack` |
-| `source-zip` | `git archive` of the committed sources (or a filtered file walk) |
+| `source-zip` | `git archive` of the committed sources, or a file walk that never includes symlinks or credential-shaped files |
 
 Every step accepts `workdir` (relative to the checkout), `env`, `when: [play|testflight|onedrive]`
 (run only when that destination is active, for example IPA archives only for TestFlight),
@@ -256,8 +268,17 @@ The version comes from the recipe's `version` (a file plus regex, or a command),
   the command line, so passwords do not show up in process listings.
 * Every log line passes through a redactor that masks known secret values. The Keys page and
   `status` command only report "configured" or "missing".
-* The Settings UI binds to `127.0.0.1`, accepts only loopback `Host` headers, and requires a
-  per-process token on every API call, so other websites in your browser cannot drive it.
+* The Settings UI binds to `127.0.0.1` and accepts only loopback `Host` headers. Its access
+  token is created per server process and kept in `<settings>/server.json` (mode 600), so
+  other user accounts on the machine cannot read it. The page opens only through the sign-in
+  link (`sdk-release-kit open`), which becomes an HttpOnly, SameSite=Strict cookie, and every
+  API call also needs the token in a header that other websites cannot send.
+* Through MCP, `run_build` publishes to the shared folder by default. Google Play and
+  TestFlight uploads need an explicit `allow_store_uploads=true`.
+* Recipes, overlays and settings cannot write or collect outside their roots: ids and target
+  names are plain names, collect globs cannot contain `..`, and resolved paths are checked.
+* **Only build repositories you trust.** Building runs the checkout's own scripts (`gradlew`,
+  `Podfile`, npm scripts, Xcode build phases) as your user, like any build tool does.
 * `.gitignore` excludes settings files, staging output and key material.
 
 ## Output

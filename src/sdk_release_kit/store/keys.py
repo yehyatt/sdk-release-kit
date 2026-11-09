@@ -65,8 +65,13 @@ def store_key_file(filename: str, content_b64: str) -> Path:
     folder = key_files_dir()
     folder.mkdir(parents=True, exist_ok=True)
     os.chmod(folder, 0o700)
-    target = folder / safe
     data = base64.b64decode(content_b64, validate=True)
+    target = folder / safe
+    # Never silently replace a different key that happens to share the name.
+    stem, suffix, n = Path(safe).stem, Path(safe).suffix, 2
+    while target.exists() and target.read_bytes() != data:
+        target = folder / f"{stem}-{n}{suffix}"
+        n += 1
     fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "wb") as fh:
         fh.write(data)

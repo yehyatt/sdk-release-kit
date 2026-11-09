@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sdk-release-kit"
-version = "0.2.0"
+version = "0.2.1"
 description = "Build mobile SDK demo apps and packages, then publish them to a shared folder, Google Play internal testing and TestFlight."
 readme = "README.md"
 license = "MIT"

@@ -1,9 +1,13 @@
 """Settings UI and JSON API. Binds to localhost only.
 
-Every ``/api`` request must carry the ``X-SRK-Token`` header. The token is generated per
-server process and embedded in the served page, so another website open in the same browser
-cannot change settings or start builds (it can neither read the page nor send custom headers
-cross-origin). Host headers are restricted to loopback names to block DNS rebinding.
+Access control:
+* The token is generated per server process and stored only in ``<settings>/server.json``
+  (mode 600), so other local users and processes running as someone else cannot read it.
+* The page is served only to a browser holding the token: ``/?token=...`` (the URL that
+  ``sdk-release-kit open`` builds) sets an HttpOnly, SameSite=Strict cookie and redirects.
+* Every ``/api`` request must also carry the ``X-SRK-Token`` header, which other websites
+  cannot add cross-origin, and Host headers are restricted to loopback names to block DNS
+  rebinding.
 """
 
 from __future__ import annotations
@@ -16,7 +20,7 @@ from typing import Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ValidationError
 
@@ -39,6 +43,14 @@ from .store import outputs as outputs_store
 from .store import repos as repos_store
 
 TOKEN = secrets.token_urlsafe(32)
+COOKIE = "srk_token"
+MAX_KEY_FILE_BYTES = 2 * 1024 * 1024
+
+LOCKED_PAGE = """<!doctype html><meta charset="utf-8"><title>SDK Release Kit</title>
+<body style="font:16px system-ui;margin:40px;max-width:560px">
+<h1>Sign-in link needed</h1>
+<p>Open the Settings UI with <code>sdk-release-kit open</code>. It starts the server if
+needed and opens this page signed in.</p></body>"""
 
 
 def require_token(x_srk_token: str = Header(default="")) -> None:
@@ -122,10 +134,25 @@ def create_app() -> FastAPI:
     app.mount("/static", StaticFiles(directory=web), name="static")
     api = [Depends(require_token)]
 
+    @app.get("/healthz")
+    def healthz() -> dict[str, str]:
+        return {"app": "sdk-release-kit", "version": __version__}
+
     @app.get("/", response_class=HTMLResponse)
-    def index() -> str:
+    def index(request: Request, token: str = ""):
+        if token:
+            if not secrets.compare_digest(token, TOKEN):
+                return HTMLResponse(LOCKED_PAGE, status_code=403)
+            resp = RedirectResponse("/", status_code=303)
+            resp.set_cookie(COOKIE, TOKEN, httponly=True, samesite="strict", path="/")
+            return resp
+        cookie = request.cookies.get(COOKIE, "")
+        if not cookie or not secrets.compare_digest(cookie, TOKEN):
+            return HTMLResponse(LOCKED_PAGE, status_code=403)
         html = (web / "index.html").read_text(encoding="utf-8")
-        return html.replace("{{SRK_TOKEN}}", TOKEN)
+        return HTMLResponse(
+            html.replace("{{SRK_TOKEN}}", TOKEN), headers={"Cache-Control": "no-store"}
+        )
 
     @app.get("/api/status", dependencies=api)
     def status() -> dict[str, Any]:
@@ -225,6 +252,8 @@ def create_app() -> FastAPI:
     def upload_key(body: KeyUpload) -> dict[str, Any]:
         if body.field not in _FILE_FIELDS:
             raise HTTPException(400, f"unknown key file field {body.field}")
+        if len(body.content_b64) > MAX_KEY_FILE_BYTES * 4 // 3 + 4:
+            raise HTTPException(413, "key files are limited to 2 MB")
         try:
             path = keys_store.store_key_file(body.filename, body.content_b64)
         except ValueError as exc:
@@ -318,14 +347,26 @@ def create_app() -> FastAPI:
 def serve(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True) -> None:
     import uvicorn
 
+    from . import launcher
+
     if host not in ("127.0.0.1", "localhost", "::1"):
         raise SystemExit("the Settings UI only binds to a loopback address")
-    url = f"http://127.0.0.1:{port}/"
-    print(f"SDK Release Kit Settings UI: {url}")
-    print(f"settings directory: {user_home()}")
+    launcher.write_state(port, TOKEN)
+    url = launcher.sign_in_url({"port": port, "token": TOKEN})
+    import sys
+
+    # Only show the token on an interactive terminal; never write it into a log file.
+    if sys.stdout.isatty():
+        print(f"SDK Release Kit Settings UI: {url}", flush=True)
+    else:
+        print(f"SDK Release Kit Settings UI on port {port} (sign in with: sdk-release-kit open)")
+    print(f"settings directory: {user_home()}", flush=True)
     if open_browser:
         threading.Timer(1.0, lambda: __import__("webbrowser").open(url)).start()
-    uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+    try:
+        uvicorn.run(create_app(), host=host, port=port, log_level="warning")
+    finally:
+        launcher.clear_state()
 
 
 __all__ = ["create_app", "serve"]

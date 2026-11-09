@@ -38,6 +38,8 @@ Suggested flow:
 2. list_recipes: recipe ids and what each builds.
 3. plan_build: a dry run that shows the exact commands, collected files and destinations.
 4. run_build: only when the user asked for a build or release. Builds can take minutes.
+   It publishes to the shared folder by default; Play or TestFlight need the user's explicit
+   request and allow_store_uploads=true.
 5. list_runs / get_run_report: inspect previous runs.
 
 Store uploads soft-skip when credentials are missing. Recipes live in git; machine paths
@@ -163,18 +165,30 @@ def run_build(
     artifacts: Artifacts = "both",
     destinations: list[str] | None = None,
     skip_upload: bool = False,
+    allow_store_uploads: bool = False,
 ) -> dict[str, Any]:
-    """Build the given recipes and publish to the given destinations. Run plan_build first
-    and only call this when the user asked for a build. Can take several minutes. Uploads to
-    Google Play or TestFlight reach real testers.
+    """Build the given recipes and publish them. Run plan_build first and only call this when
+    the user asked for a build. Can take several minutes.
+
+    destinations defaults to ["onedrive"] (the shared folder). "play" and "testflight" reach
+    real testers: include them only when the user explicitly asked for a store upload in this
+    conversation, and then also set allow_store_uploads=true.
 
     Returns the run report (artifacts, upload results, ok flag) and the end of the log.
     """
+    dests = list(destinations) if destinations is not None else ["onedrive"]
+    unknown = [d for d in dests if d not in DESTINATIONS]
+    if unknown:
+        raise ValueError(f"unknown destination(s): {', '.join(unknown)}")
+    stores = [d for d in dests if d in ("play", "testflight")]
+    if stores and not allow_store_uploads and not skip_upload:
+        raise ValueError(
+            f"{', '.join(stores)} upload needs allow_store_uploads=true, and only when the "
+            "user explicitly asked for it"
+        )
     log = RunLog()
     report = Pipeline(log=log).run(
-        RunOptions(
-            sdks=sdks, artifacts=artifacts, destinations=destinations, skip_upload=skip_upload
-        )
+        RunOptions(sdks=sdks, artifacts=artifacts, destinations=dests, skip_upload=skip_upload)
     )
     return {"report": report, "log_tail": _log_tail(log)}
 
@@ -224,7 +238,8 @@ def get_run_report(run: str, log_lines: int = 200) -> dict[str, Any]:
 @server.tool(annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True))
 @agent_errors
 def set_repo_path(recipe_id: str, path: str, enabled: bool = True) -> dict[str, Any]:
-    """Point a recipe at its local checkout (Repositories settings). The folder must exist."""
+    """Point a recipe at its local checkout (Repositories settings). The folder must exist.
+    Building a checkout runs its own build scripts, so only use a path the user gave you."""
     if recipe_id not in load_recipes().recipes:
         raise ValueError(f"unknown recipe id {recipe_id}")
     resolved = expand(path)

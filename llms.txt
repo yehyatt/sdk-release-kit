@@ -4,7 +4,7 @@
 
 Install: `pip install sdk-release-kit` (or run without installing: `uvx sdk-release-kit --help`).
 MCP server (stdio): `uvx sdk-release-kit mcp`. Tools: get_status, list_recipes, plan_build, run_build, list_runs, get_run_report, set_repo_path.
-CLI: `sdk-release-kit init`, `serve`, `build --sdks <ids> --artifacts demos|packages|both --dest onedrive,play,testflight [--dry-run] [--skip-upload]`, `recipes`, `status`, `keys set <name>`.
+CLI: `sdk-release-kit init`, `open` (Settings UI, signed in), `stop`, `serve`, `build --sdks <ids> --artifacts demos|packages|both --dest onedrive,play,testflight [--dry-run] [--skip-upload]`, `recipes`, `status`, `keys set <name>`.
 
 ## Docs
 
