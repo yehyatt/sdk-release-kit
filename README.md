@@ -66,6 +66,55 @@ sdk-release-kit build --sdks flutter,android-current --artifacts both --dest one
 Machine-specific recipe tweaks go in `<settings>/recipes.d/*.yaml`. They are deep-merged over
 `recipes/sdks.yaml`, so you can change one scheme name without forking the file.
 
+## Adapting it to your SDKs
+
+The shipped recipes use placeholder names. Do these three things before your first release.
+
+1. **Match the recipes to your repositories.** Open `recipes/sdks.yaml` and check, for every
+   recipe you use, the `workdir`, Xcode `workspace` and `scheme`, Gradle tasks, `framework_name`
+   and `collect` globs. Placeholders include `DemoApp`, `PaymentSDK`, `SimpleIntegration`,
+   `:app` and `example/`. If the change applies to everyone using the repo, edit the file and
+   commit it. If it only applies to your machine, put just the changed keys in
+   `<settings>/recipes.d/local.yaml`; it is deep-merged over the shipped file:
+
+   ```yaml
+   recipes:
+     ios-current:
+       demos:
+         - type: xcode-simulator
+           workspace: Example/Example.xcworkspace
+           scheme: Example
+           target: ios-native-current
+   ```
+
+   Lists such as `demos` are replaced as a whole, so repeat every step of a list you override.
+   Then run `sdk-release-kit build --dry-run --sdks <id>` and read the commands it prints.
+
+2. **Put your real identifiers in Custom data, not in git.** The recipes read store ids and the
+   Apple team from `custom.yaml` (Custom data page), falling back to `com.example.*`:
+
+   ```yaml
+   ios_team_id: "ABCDE12345"
+   app_ids:
+     android_native: com.yourcompany.sdk.demo
+     ios_native: com.yourcompany.sdk.demoapp
+     flutter_android: com.yourcompany.sdk.flutter.demoapp
+     flutter_ios: com.yourcompany.sdk.flutter.demoapp
+     rn_android: com.yourcompany.sdk.reactnative.demoapp
+     rn_ios: com.yourcompany.sdk.reactnative.demoapp
+   ```
+
+   A recipe with an empty `android_package` is skipped for Play. A `com.example.*` id is not
+   skipped: the upload fails, because Play only accepts apps that exist in your Play Console.
+
+3. **Prove each destination once.** Start with the shared folder only:
+   `sdk-release-kit build --sdks <id> --artifacts demos --dest onedrive`, and open the copied
+   APK or `.app`. Then fill in the Keys page (the Keys chips must all show "configured") and
+   run one upload per store with a single recipe:
+   `--dest play` with an Android recipe, `--dest testflight` with an iOS one. Check the build
+   appears on the internal track or in TestFlight before relying on combined runs. Each run's
+   `report.json` lists what was uploaded, skipped or failed and why.
+
 ## Multi-device setup
 
 1. Clone the repository and `pip install -e .` on the new machine.
