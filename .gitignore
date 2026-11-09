@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+build/
+dist/
+.pytest_cache/
+.ruff_cache/
+
+# Local settings never belong in git (they live in ~/.config/sdk-release-kit/)
+repos.yaml
+outputs.yaml
+keys.yaml
+custom.yaml
+recipes.d/
+!examples/*.example.yaml
+
+# Build output
+staging/
+runs/
+
+# Secrets and key material
+.env
+.env.*
+*.keystore
+*.jks
+*.p8
+*.p12
+*.pem
+*.mobileprovision
+key.properties
+*service-account*.json
+*adminsdk*.json
+client_secret*.json
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/

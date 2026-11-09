@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sdk-release-kit"
+version = "0.1.0"
+description = "Build mobile SDK demo apps and packages, then publish them to a shared folder, Google Play internal testing and TestFlight."
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+requires-python = ">=3.11"
+keywords = ["android", "ios", "flutter", "react-native", "sdk", "release", "testflight", "google-play"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "Operating System :: MacOS",
+  "Topic :: Software Development :: Build Tools",
+]
+dependencies = [
+  "typer>=0.12",
+  "fastapi>=0.110",
+  "uvicorn>=0.29",
+  "pydantic>=2.6",
+  "PyYAML>=6.0",
+  "keyring>=24",
+]
+
+[project.optional-dependencies]
+play = ["google-api-python-client>=2.100", "google-auth>=2.25"]
+dev = ["pytest>=8", "ruff>=0.4"]
+
+[project.scripts]
+sdk-release-kit = "sdk_release_kit.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sdk_release_kit"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"recipes" = "sdk_release_kit/_data/recipes"
+"web" = "sdk_release_kit/_data/web"
+"examples" = "sdk_release_kit/_data/examples"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B"]

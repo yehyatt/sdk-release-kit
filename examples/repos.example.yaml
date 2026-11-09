@@ -1,0 +1,33 @@
+# Repositories: recipe id -> checkout on THIS machine. Not committed anywhere.
+# Copied to <settings dir>/repos.yaml by `sdk-release-kit init`.
+schema_version: 1
+repos:
+  android-current:
+    path: ~/path/to/payment-sdk-android
+    enabled: true
+  android-legacy:
+    path: ~/path/to/payment-sdk-android-legacy
+    enabled: false
+  ios-current:
+    path: ~/path/to/payment-sdk-ios
+    enabled: false
+  ios-legacy:
+    path: ~/path/to/payment-sdk-ios-legacy
+    enabled: false
+  flutter:
+    path: ~/path/to/payment-sdk-flutter
+    enabled: false
+  reactnative-current:
+    path: ~/path/to/payment-sdk-react-native
+    enabled: false
+  reactnative-legacy:
+    path: ~/path/to/payment-sdk-react-native-legacy
+    enabled: false
+tooling:
+  # Android Studio's bundled JDK on macOS is usually:
+  # /Applications/Android Studio.app/Contents/jbr/Contents/Home
+  java_home: null
+  android_sdk: ~/Library/Android/sdk
+  flutter_bin: null      # e.g. ~/path/to/flutter/bin
+  developer_dir: null    # e.g. /Applications/Xcode.app/Contents/Developer
+  extra_path: []

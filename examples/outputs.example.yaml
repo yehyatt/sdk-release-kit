@@ -1,0 +1,19 @@
+# Outputs: where artifacts go. Not committed anywhere.
+schema_version: 1
+staging: ~/sdk-release-kit/staging
+onedrive:
+  # Any locally synced folder works (OneDrive, Google Drive, Dropbox, an SMB mount).
+  enabled: false
+  root: ~/path/to/OneDrive/Mobile SDK Builds
+  demos_android: android
+  demos_ios: ios
+  packages: packages
+  copy_untargeted: false
+play:
+  enabled: false
+  track: internal
+  release_status: completed   # use "draft" for an app that has never been published
+  method: auto                # auto | api | fastlane
+testflight:
+  enabled: false
+  method: altool              # altool | fastlane

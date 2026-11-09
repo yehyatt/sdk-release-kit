@@ -1,0 +1,18 @@
+# Keys: PATHS to key files and REFERENCES to secrets. Never put a password in this file.
+# A secret reference is {source: env|keychain|none, name: ...}.
+#   env:      read from the environment variable `name`
+#   keychain: read from the OS keychain, service "sdk-release-kit", account `name`
+#             (set with `sdk-release-kit keys set <name>` or the Keys page)
+schema_version: 1
+android:
+  keystore_path: ~/path/to/release.keystore
+  key_alias: release
+  store_password: {source: keychain, name: android.store_password}
+  key_password: {source: keychain, name: android.key_password}
+  inject_signing: true
+play:
+  json_key_path: ~/path/to/play-service-account.json
+testflight:
+  key_id: {source: env, name: ASC_KEY_ID}
+  issuer_id: {source: env, name: ASC_ISSUER_ID}
+  key_path: ~/path/to/AuthKey_XXXXXXXXXX.p8

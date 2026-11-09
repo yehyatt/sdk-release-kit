@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="srk-token" content="{{SRK_TOKEN}}">
+  <title>SDK Release Kit</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">SDK Release Kit <span id="version" class="muted"></span></div>
+    <nav id="tabs">
+      <button data-tab="repos" class="active">Repositories</button>
+      <button data-tab="outputs">Outputs</button>
+      <button data-tab="keys">Keys</button>
+      <button data-tab="custom">Custom data</button>
+      <button data-tab="run">Run</button>
+    </nav>
+  </header>
+
+  <main>
+    <div id="toast" class="toast" hidden></div>
+
+    <section id="tab-repos" class="tab">
+      <h1>Repositories</h1>
+      <p class="muted">Point each recipe at its checkout on this machine. Paths are stored in
+        <code id="repos-file"></code>, never in git.</p>
+      <table class="grid" id="repos-table">
+        <thead><tr><th>On</th><th>Recipe</th><th>Checkout path</th><th>Check</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <h2>Tooling</h2>
+      <div class="form" id="tooling-form">
+        <label>JAVA_HOME <input name="java_home" placeholder="/Applications/Android Studio.app/Contents/jbr/Contents/Home"></label>
+        <label>Android SDK <input name="android_sdk" placeholder="~/Library/Android/sdk"></label>
+        <label>Flutter bin <input name="flutter_bin" placeholder="~/path/to/flutter/bin"></label>
+        <label>Xcode DEVELOPER_DIR <input name="developer_dir" placeholder="/Applications/Xcode.app/Contents/Developer"></label>
+        <label>Extra PATH entries <input name="extra_path" placeholder="comma-separated"></label>
+      </div>
+      <div class="actions"><button class="primary" id="save-repos">Save</button></div>
+    </section>
+
+    <section id="tab-outputs" class="tab" hidden>
+      <h1>Outputs</h1>
+      <div class="form">
+        <label>Staging directory <input data-k="staging" placeholder="~/sdk-release-kit/staging"></label>
+      </div>
+      <h2><label class="inline"><input type="checkbox" data-k="onedrive.enabled"> Shared folder (OneDrive or any synced folder)</label></h2>
+      <div class="form">
+        <label>Root <input data-k="onedrive.root" placeholder="~/Library/CloudStorage/OneDrive-Org/SDK Builds"></label>
+        <label>Android demos subfolder <input data-k="onedrive.demos_android"></label>
+        <label>iOS demos subfolder <input data-k="onedrive.demos_ios"></label>
+        <label>Packages subfolder <input data-k="onedrive.packages"></label>
+        <label class="inline"><input type="checkbox" data-k="onedrive.copy_untargeted"> Also copy demos without a target id</label>
+      </div>
+      <h2><label class="inline"><input type="checkbox" data-k="play.enabled"> Google Play</label></h2>
+      <div class="form">
+        <label>Track <input data-k="play.track"></label>
+        <label>Release status
+          <select data-k="play.release_status"><option>completed</option><option>draft</option></select></label>
+        <label>Method
+          <select data-k="play.method"><option>auto</option><option>api</option><option>fastlane</option></select></label>
+        <p class="muted">The service account JSON is set on the Keys page.</p>
+      </div>
+      <h2><label class="inline"><input type="checkbox" data-k="testflight.enabled"> TestFlight</label></h2>
+      <div class="form">
+        <label>Method
+          <select data-k="testflight.method"><option>altool</option><option>fastlane</option></select></label>
+        <p class="muted">The App Store Connect API key is set on the Keys page.</p>
+      </div>
+      <div class="actions"><button class="primary" id="save-outputs">Save</button></div>
+    </section>
+
+    <section id="tab-keys" class="tab" hidden>
+      <h1>Keys</h1>
+      <p class="muted">Key files are referenced by path or uploaded into the private settings
+        directory. Passwords go to the OS keychain or an environment variable; their values are
+        never shown here.</p>
+      <div id="keys-status" class="chips"></div>
+
+      <h2>Android signing</h2>
+      <div class="form">
+        <label>Keystore path <span class="row"><input data-key="android.keystore_path">
+          <input type="file" data-upload="android.keystore_path"></span></label>
+        <label>Key alias <input data-key="android.key_alias"></label>
+        <div class="secret" data-secret="android.store_password"></div>
+        <div class="secret" data-secret="android.key_password"></div>
+        <label class="inline"><input type="checkbox" data-key="android.inject_signing"> Inject signing into Gradle builds</label>
+      </div>
+
+      <h2>Google Play</h2>
+      <div class="form">
+        <label>Service account JSON <span class="row"><input data-key="play.json_key_path">
+          <input type="file" data-upload="play.json_key_path" accept=".json"></span></label>
+      </div>
+
+      <h2>App Store Connect (TestFlight)</h2>
+      <div class="form">
+        <label>.p8 key file <span class="row"><input data-key="testflight.key_path">
+          <input type="file" data-upload="testflight.key_path" accept=".p8"></span></label>
+        <div class="secret" data-secret="testflight.key_id"></div>
+        <div class="secret" data-secret="testflight.issuer_id"></div>
+      </div>
+      <div class="actions"><button class="primary" id="save-keys">Save</button></div>
+    </section>
+
+    <section id="tab-custom" class="tab" hidden>
+      <h1>Custom data</h1>
+      <p class="muted">Free-form YAML. Recipes read values as <code>${custom.some.key}</code>.
+        Comments and unknown keys are kept exactly as written.</p>
+      <textarea id="custom-text" spellcheck="false" rows="22"></textarea>
+      <div class="actions"><button class="primary" id="save-custom">Save</button></div>
+    </section>
+
+    <section id="tab-run" class="tab" hidden>
+      <h1>Run</h1>
+      <div class="run-grid">
+        <fieldset><legend>SDKs</legend><div id="run-sdks"></div></fieldset>
+        <fieldset><legend>Artifacts</legend>
+          <label class="inline"><input type="radio" name="artifacts" value="both" checked> Both</label>
+          <label class="inline"><input type="radio" name="artifacts" value="demos"> Demos</label>
+          <label class="inline"><input type="radio" name="artifacts" value="packages"> Packages</label>
+        </fieldset>
+        <fieldset><legend>Destinations</legend>
+          <label class="inline"><input type="checkbox" name="dest" value="onedrive"> Shared folder</label>
+          <label class="inline"><input type="checkbox" name="dest" value="play"> Google Play</label>
+          <label class="inline"><input type="checkbox" name="dest" value="testflight"> TestFlight</label>
+          <label class="inline"><input type="checkbox" id="skip-upload"> Build only (skip upload)</label>
+        </fieldset>
+      </div>
+      <div class="actions">
+        <button id="dry-run">Dry run</button>
+        <button class="primary" id="start-run">Start</button>
+        <span id="run-state" class="muted"></span>
+      </div>
+      <pre id="run-log" class="log"></pre>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,222 @@
+# Portable build recipes. Shipped in git.
+#
+# Rules (see AGENTS.md):
+# - Paths here are RELATIVE to the SDK checkout. Absolute paths belong in user settings.
+# - No secrets. Identifiers that differ per team come from Custom data via ${custom.key:-default}.
+# - Adjust workdirs, workspaces and schemes to your repositories, or override them per machine
+#   with a file in <settings dir>/recipes.d/ (deep-merged over this file).
+#
+# Step types: run, gradle, flutter, xcode-simulator, xcode-ipa, xcframework, npm-pack, source-zip.
+# Optional on any step: name, workdir, env, when: [onedrive|play|testflight], host: any|macos,
+# collect: [{glob, kind, target, root, required}].
+
+schema_version: 1
+
+# Shared-folder targets for demo apps: <onedrive root>/<outputs.onedrive[folder]>/<name>
+onedrive_targets:
+  android-native-current: {folder: demos_android, name: native-current.apk}
+  android-native-legacy: {folder: demos_android, name: native-legacy.apk}
+  android-flutter: {folder: demos_android, name: flutter.apk}
+  android-rn-current: {folder: demos_android, name: rn-current.apk}
+  android-rn-legacy: {folder: demos_android, name: rn-legacy.apk}
+  ios-native-current: {folder: demos_ios, name: native-current.app}
+  ios-native-legacy: {folder: demos_ios, name: native-legacy.app}
+  ios-flutter: {folder: demos_ios, name: flutter.app}
+  ios-rn-current: {folder: demos_ios, name: rn-current.app}
+  ios-rn-legacy: {folder: demos_ios, name: rn-legacy.app}
+
+recipes:
+  # ------------------------------------------------------------------------------- Android
+  android-current:
+    platform: android
+    label: Android native SDK (current)
+    version: {file: gradle.properties, regex: '^\s*VERSION_NAME\s*=\s*(\S+)'}
+    store:
+      play: true
+      android_package: "${custom.app_ids.android_native:-com.example.paymentsdk.demo}"
+    demos:
+      - type: gradle
+        name: demo APK + AAB
+        tasks: [":app:assembleRelease", ":app:bundleRelease"]
+        collect:
+          - {glob: "app/build/outputs/apk/release/*.apk", kind: apk, target: android-native-current}
+          - {glob: "app/build/outputs/bundle/release/*.aab", kind: aab}
+    packages:
+      - type: gradle
+        name: AARs to Maven local
+        tasks: [publishToMavenLocal]
+        sign: false
+        collect:
+          - {glob: "*/build/outputs/aar/*-release.aar", kind: aar}
+
+  android-legacy:
+    platform: android
+    label: Android native SDK (legacy)
+    version: {file: gradle.properties, regex: '^\s*VERSION_NAME\s*=\s*(\S+)'}
+    store:
+      play: false  # same applicationId as android-current: shared folder only
+      android_package: "${custom.app_ids.android_native:-com.example.paymentsdk.demo}"
+    demos:
+      - type: gradle
+        name: demo APK + AAB
+        tasks: [":app:assembleRelease", ":app:bundleRelease"]
+        collect:
+          - {glob: "app/build/outputs/apk/release/*.apk", kind: apk, target: android-native-legacy}
+          - {glob: "app/build/outputs/bundle/release/*.aab", kind: aab}
+    packages:
+      - type: gradle
+        name: AARs to Maven local
+        tasks: [publishToMavenLocal]
+        sign: false
+        collect:
+          - {glob: "*/build/outputs/aar/*-release.aar", kind: aar}
+
+  # ----------------------------------------------------------------------------------- iOS
+  ios-current:
+    platform: ios
+    label: iOS native SDK (current)
+    store:
+      testflight: true
+      ios_bundle_id: "${custom.app_ids.ios_native:-com.example.paymentsdk.demoapp}"
+    demos:
+      - type: xcode-simulator
+        name: simulator .app
+        workspace: DemoApp/DemoApp.xcworkspace
+        scheme: DemoApp
+        pod_install: false
+        target: ios-native-current
+      - type: xcode-ipa
+        name: archive + IPA for TestFlight
+        when: [testflight]
+        workspace: DemoApp/DemoApp.xcworkspace
+        scheme: DemoApp
+        team_id: "${custom.ios_team_id:-}"
+    packages:
+      - type: xcframework
+        workspace: DemoApp/DemoApp.xcworkspace
+        scheme: PaymentSDK
+        framework_name: PaymentSDK
+
+  ios-legacy:
+    platform: ios
+    label: iOS native SDK (legacy)
+    store:
+      testflight: false  # same bundle id as ios-current: shared folder only
+      ios_bundle_id: "${custom.app_ids.ios_native:-com.example.paymentsdk.demoapp}"
+    demos:
+      - type: xcode-simulator
+        name: simulator .app
+        workspace: DemoApp/DemoApp.xcworkspace
+        scheme: DemoApp
+        target: ios-native-legacy
+    packages:
+      - type: xcframework
+        workspace: DemoApp/DemoApp.xcworkspace
+        scheme: PaymentSDK
+        framework_name: PaymentSDK
+
+  # ------------------------------------------------------------------------------- Flutter
+  flutter:
+    platform: flutter
+    label: Flutter plugin
+    version: {file: pubspec.yaml, regex: '^version:\s*(\S+)'}
+    store:
+      play: true
+      testflight: true
+      android_package: "${custom.app_ids.flutter_android:-com.example.paymentsdk.flutter.demoapp}"
+      ios_bundle_id: "${custom.app_ids.flutter_ios:-com.example.paymentsdk.flutter.demoapp}"
+    demos:
+      - {type: flutter, name: pub get, workdir: example, args: [pub, get]}
+      - type: flutter
+        name: demo APK
+        workdir: example
+        args: [build, apk, --release]
+        collect:
+          - {glob: "build/app/outputs/flutter-apk/app-release.apk", kind: apk, target: android-flutter}
+      - type: flutter
+        name: demo AAB
+        workdir: example
+        when: [play]
+        args: [build, appbundle, --release]
+        collect:
+          - {glob: "build/app/outputs/bundle/release/*.aab", kind: aab}
+      - type: flutter
+        name: simulator .app
+        workdir: example
+        host: macos
+        args: [build, ios, --simulator, --debug]
+        collect:
+          - {glob: "build/ios/iphonesimulator/Runner.app", kind: app, target: ios-flutter}
+      - type: flutter
+        name: IPA for TestFlight
+        workdir: example
+        host: macos
+        when: [testflight]
+        args: [build, ipa, --release, --export-method, app-store]
+        collect:
+          - {glob: "build/ios/ipa/*.ipa", kind: ipa}
+    packages:
+      - {type: source-zip, name: package sources}
+
+  # -------------------------------------------------------------------------- React Native
+  reactnative-current:
+    platform: reactnative
+    label: React Native SDK (current)
+    version: {file: package.json, regex: '"version"\s*:\s*"([^"]+)"'}
+    store:
+      play: true
+      testflight: true
+      android_package: "${custom.app_ids.rn_android:-com.example.paymentsdk.reactnative.demoapp}"
+      ios_bundle_id: "${custom.app_ids.rn_ios:-com.example.paymentsdk.reactnative.demoapp}"
+    demos:
+      - {type: run, name: install demo deps, workdir: SimpleIntegration, cmd: [npm, install]}
+      - type: gradle
+        name: demo APK + AAB
+        workdir: SimpleIntegration/android
+        tasks: [assembleRelease, bundleRelease]
+        collect:
+          - {glob: "app/build/outputs/apk/release/*.apk", kind: apk, target: android-rn-current}
+          - {glob: "app/build/outputs/bundle/release/*.aab", kind: aab}
+      - type: xcode-simulator
+        name: simulator .app
+        workdir: SimpleIntegration/ios
+        workspace: SimpleIntegration.xcworkspace
+        scheme: SimpleIntegration
+        pod_install: true
+        target: ios-rn-current
+      - type: xcode-ipa
+        name: archive + IPA for TestFlight
+        when: [testflight]
+        workdir: SimpleIntegration/ios
+        workspace: SimpleIntegration.xcworkspace
+        scheme: SimpleIntegration
+        team_id: "${custom.ios_team_id:-}"
+    packages:
+      - {type: npm-pack, name: npm pack}
+
+  reactnative-legacy:
+    platform: reactnative
+    label: React Native SDK (legacy)
+    version: {file: package.json, regex: '"version"\s*:\s*"([^"]+)"'}
+    store:
+      play: false  # duplicates of reactnative-current ids: shared folder only
+      testflight: false
+      android_package: "${custom.app_ids.rn_android:-com.example.paymentsdk.reactnative.demoapp}"
+      ios_bundle_id: "${custom.app_ids.rn_ios:-com.example.paymentsdk.reactnative.demoapp}"
+    demos:
+      - {type: run, name: install demo deps, workdir: SimpleIntegration, cmd: [npm, install]}
+      - type: gradle
+        name: demo APK
+        workdir: SimpleIntegration/android
+        tasks: [assembleRelease]
+        collect:
+          - {glob: "app/build/outputs/apk/release/*.apk", kind: apk, target: android-rn-legacy}
+      - type: xcode-simulator
+        name: simulator .app
+        workdir: SimpleIntegration/ios
+        workspace: SimpleIntegration.xcworkspace
+        scheme: SimpleIntegration
+        pod_install: true
+        target: ios-rn-legacy
+    packages:
+      - {type: npm-pack, name: npm pack}

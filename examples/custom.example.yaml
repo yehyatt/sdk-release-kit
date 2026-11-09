@@ -1,0 +1,18 @@
+# Custom data: free-form YAML. Recipes read it through ${custom.some.key}.
+# Unknown keys are kept as written, so teams and AI agents can add their own.
+
+# Apple Developer team used for archive and export (leave empty for automatic).
+ios_team_id: ""
+
+# Store identifiers of the demo apps, used for Play and TestFlight uploads.
+app_ids:
+  android_native: com.example.paymentsdk.demo
+  ios_native: com.example.paymentsdk.demoapp
+  flutter_android: com.example.paymentsdk.flutter.demoapp
+  flutter_ios: com.example.paymentsdk.flutter.demoapp
+  rn_android: com.example.paymentsdk.reactnative.demoapp
+  rn_ios: com.example.paymentsdk.reactnative.demoapp
+
+# Anything else your team wants to keep with the tool, for example:
+# notify:
+#   slack_webhook_env: SLACK_WEBHOOK_URL
