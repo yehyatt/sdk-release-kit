@@ -1,5 +1,7 @@
 # SDK Release Kit
 
+[![yehyatt/sdk-release-kit MCP server](https://glama.ai/mcp/servers/yehyatt/sdk-release-kit/badges/score.svg)](https://glama.ai/mcp/servers/yehyatt/sdk-release-kit)
+
 Build mobile SDK demo apps and SDK packages from one or more local checkouts, then publish
 them to a shared folder (OneDrive or any synced folder), Google Play internal testing and
 TestFlight. Configure it once per machine through a local Settings UI; the same repository
