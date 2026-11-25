@@ -88,6 +88,10 @@ claude mcp add sdk-release-kit -- uvx sdk-release-kit mcp
 }
 ```
 
+A `Dockerfile` runs the same MCP server in a container (`docker build -t sdk-release-kit .`,
+then `docker run -i --rm sdk-release-kit`). That is enough for status, recipes and dry-run
+plans; real builds need Xcode, Gradle or Flutter, so run the kit natively for those.
+
 The server never returns secret values, and keys are still entered through the Settings UI.
 Agents are told to plan before building. `run_build` publishes only to the shared folder
 unless the agent passes `play` or `testflight` together with `allow_store_uploads=true`, which

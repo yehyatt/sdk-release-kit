@@ -11,11 +11,12 @@ import functools
 import json
 import shutil
 from collections.abc import Callable
-from typing import Any, Literal, TypeVar
+from typing import Annotated, Any, Literal, TypeVar
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
+from pydantic import Field
 
 from . import __version__
 from .models import DESTINATIONS, RepoEntry
@@ -71,8 +72,25 @@ def agent_errors(fn: F) -> F:
     return wrapper  # type: ignore[return-value]
 
 
-READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=False)
-Artifacts = Literal["demos", "packages", "both"]
+def read_only(title: str) -> ToolAnnotations:
+    return ToolAnnotations(title=title, readOnlyHint=True, openWorldHint=False)
+
+
+Artifacts = Annotated[
+    Literal["demos", "packages", "both"],
+    Field(
+        description="What to build: 'demos' (demo apps: APK/AAB/IPA), 'packages' (SDK "
+        "packages: AAR, XCFramework, pub/npm archives) or 'both'."
+    ),
+]
+SdkIds = Field(
+    description="Recipe ids to build, as returned by list_recipes (for example "
+    "['flutter', 'android-current'])."
+)
+DESTINATIONS_HELP = (
+    "Where to publish: any of 'onedrive' (the synced shared folder), 'play' "
+    "(Google Play internal testing) and 'testflight'."
+)
 
 
 def _log_tail(log: RunLog, limit: int = 300) -> list[str]:
@@ -80,11 +98,16 @@ def _log_tail(log: RunLog, limit: int = 300) -> list[str]:
     return lines[-limit:] if len(lines) > limit else lines
 
 
-@server.tool(annotations=READ_ONLY)
+@server.tool(annotations=read_only("Get setup status"))
 @agent_errors
 def get_status() -> dict[str, Any]:
-    """Settings files, repository checkouts, key status (configured or missing, never values),
-    destination readiness and build tools found on PATH."""
+    """Report whether this machine is ready to build and publish. Call this first.
+
+    Returns the settings directory and which settings files exist; each recipe's checkout path,
+    whether it is enabled and whether the folder exists; each key as "configured" or "missing"
+    (never the value); whether onedrive, play and testflight are ready or why they would be
+    skipped; and the paths of git, java, flutter, xcodebuild, pod, npm and fastlane on PATH.
+    Reads local settings only and changes nothing."""
     settings = load_all()
     pipeline = Pipeline(settings=settings)
     repos = {}
@@ -117,10 +140,15 @@ def get_status() -> dict[str, Any]:
     }
 
 
-@server.tool(annotations=READ_ONLY)
+@server.tool(annotations=read_only("List build recipes"))
 @agent_errors
 def list_recipes() -> dict[str, Any]:
-    """Recipe ids with platform, steps and store flags, plus whether each has a checkout."""
+    """List every build recipe the kit knows, so you can pick ids for plan_build and run_build.
+
+    For each recipe id: platform (android, ios, flutter, react-native), label, the names of its
+    demo and package steps, whether it can go to Play and TestFlight, and the local checkout it
+    is pointed at (null when none; fix that with set_repo_path). Also returns the recipe files
+    that were loaded. Changes nothing."""
     recipes = load_recipes()
     repos = load_all().repos.repos
     out = {}
@@ -138,19 +166,27 @@ def list_recipes() -> dict[str, Any]:
     return {"sources": [str(s) for s in recipe_sources()], "recipes": out}
 
 
-@server.tool(annotations=READ_ONLY)
+@server.tool(annotations=read_only("Plan a build (dry run)"))
 @agent_errors
 def plan_build(
-    sdks: list[str] | None = None,
+    sdks: Annotated[
+        list[str] | None,
+        Field(description="Recipe ids from list_recipes. Omit to plan every enabled recipe."),
+    ] = None,
     artifacts: Artifacts = "both",
-    destinations: list[str] | None = None,
+    destinations: Annotated[
+        list[str] | None,
+        Field(
+            description=DESTINATIONS_HELP
+            + " Omit to use the destinations enabled in the Outputs settings."
+        ),
+    ] = None,
 ) -> dict[str, Any]:
-    """Dry run. Shows the commands that would run, the files that would be collected and
-    which destinations are ready or skipped. Builds nothing.
+    """Dry run of a release: shows exactly what run_build would do, without building or uploading.
 
-    sdks: recipe ids; default is every enabled repository.
-    destinations: subset of onedrive, play, testflight; default is those enabled in Outputs.
-    """
+    Returns the plan lines (each shell command per recipe step, the file globs that would be
+    collected), which destinations are ready or skipped and why, and the same report shape as
+    run_build. Use it before every run_build and show the plan to the user."""
     log = RunLog()
     result = Pipeline(log=log).run(
         RunOptions(sdks=sdks, artifacts=artifacts, destinations=destinations, dry_run=True)
@@ -158,14 +194,29 @@ def plan_build(
     return {**result, "plan": log.lines}
 
 
-@server.tool(annotations=ToolAnnotations(destructiveHint=False, openWorldHint=True))
+@server.tool(
+    annotations=ToolAnnotations(
+        title="Build and publish", readOnlyHint=False, destructiveHint=False, openWorldHint=True
+    )
+)
 @agent_errors
 def run_build(
-    sdks: list[str],
+    sdks: Annotated[list[str], SdkIds],
     artifacts: Artifacts = "both",
-    destinations: list[str] | None = None,
-    skip_upload: bool = False,
-    allow_store_uploads: bool = False,
+    destinations: Annotated[
+        list[str] | None,
+        Field(description=DESTINATIONS_HELP + " Omit to publish to onedrive only."),
+    ] = None,
+    skip_upload: Annotated[
+        bool, Field(description="Build and collect the files, but publish nowhere.")
+    ] = False,
+    allow_store_uploads: Annotated[
+        bool,
+        Field(
+            description="Must be true for 'play' or 'testflight'. Set it only when the user "
+            "explicitly asked for a store upload in this conversation."
+        ),
+    ] = False,
 ) -> dict[str, Any]:
     """Build the given recipes and publish them. Run plan_build first and only call this when
     the user asked for a build. Can take several minutes.
@@ -193,10 +244,16 @@ def run_build(
     return {"report": report, "log_tail": _log_tail(log)}
 
 
-@server.tool(annotations=READ_ONLY)
+@server.tool(annotations=read_only("List previous runs"))
 @agent_errors
-def list_runs(limit: int = 10) -> list[dict[str, Any]]:
-    """Most recent runs with their outcome."""
+def list_runs(
+    limit: Annotated[int, Field(description="How many runs to return, newest first.")] = 10,
+) -> list[dict[str, Any]]:
+    """List previous build runs, newest first.
+
+    Each entry has the run id (pass it to get_run_report), ok (true, false, or null when the run
+    was interrupted before writing a report), the recipe ids requested and each recipe's build
+    status. Returns an empty list when nothing has run yet."""
     staging = expand(load_all().outputs.staging)
     runs_dir = staging / "runs" if staging else None
     if not runs_dir or not runs_dir.is_dir():
@@ -219,10 +276,18 @@ def list_runs(limit: int = 10) -> list[dict[str, Any]]:
     return out
 
 
-@server.tool(annotations=READ_ONLY)
+@server.tool(annotations=read_only("Get a run report"))
 @agent_errors
-def get_run_report(run: str, log_lines: int = 200) -> dict[str, Any]:
-    """Full report.json and the last lines of log.txt for one run id from list_runs."""
+def get_run_report(
+    run: Annotated[str, Field(description="A run id from list_runs.")],
+    log_lines: Annotated[
+        int, Field(description="How many lines from the end of the run log to include.")
+    ] = 200,
+) -> dict[str, Any]:
+    """Show what happened in one previous run, to explain a failure or find the built files.
+
+    Returns the run's full report (options, each build's status and collected artifacts, each
+    upload's result) and the last lines of its log, with secrets already redacted."""
     staging = expand(load_all().outputs.staging)
     if staging is None or "/" in run or run.startswith("."):
         raise ValueError("invalid run id")
@@ -235,11 +300,29 @@ def get_run_report(run: str, log_lines: int = 200) -> dict[str, Any]:
     return {"report": report, "log_tail": lines[-log_lines:]}
 
 
-@server.tool(annotations=ToolAnnotations(destructiveHint=False, idempotentHint=True))
+@server.tool(
+    annotations=ToolAnnotations(
+        title="Set a recipe's checkout",
+        readOnlyHint=False,
+        destructiveHint=False,
+        idempotentHint=True,
+        openWorldHint=False,
+    )
+)
 @agent_errors
-def set_repo_path(recipe_id: str, path: str, enabled: bool = True) -> dict[str, Any]:
-    """Point a recipe at its local checkout (Repositories settings). The folder must exist.
-    Building a checkout runs its own build scripts, so only use a path the user gave you."""
+def set_repo_path(
+    recipe_id: Annotated[str, Field(description="A recipe id from list_recipes.")],
+    path: Annotated[
+        str, Field(description="Local folder of the SDK checkout; ~ is expanded. Must exist.")
+    ],
+    enabled: Annotated[
+        bool, Field(description="Whether builds that omit sdks include this recipe.")
+    ] = True,
+) -> dict[str, Any]:
+    """Point a recipe at its local checkout and save it in the Repositories settings.
+
+    Building a checkout runs that repository's own build scripts, so only use a path the user
+    gave you. Returns the saved path, its resolved absolute form and the enabled flag."""
     if recipe_id not in load_recipes().recipes:
         raise ValueError(f"unknown recipe id {recipe_id}")
     resolved = expand(path)
