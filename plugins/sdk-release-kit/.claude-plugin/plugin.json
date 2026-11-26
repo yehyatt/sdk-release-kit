@@ -1,6 +1,6 @@
 {
   "name": "sdk-release-kit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Build Android, iOS, Flutter and React Native SDK demo apps and packages and publish them to a shared folder, Google Play internal testing and TestFlight.",
   "author": {
     "name": "Yahya",

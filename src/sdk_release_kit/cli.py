@@ -167,6 +167,14 @@ def status() -> None:
     typer.echo("tools:")
     for tool in ("git", "java", "flutter", "xcodebuild", "pod", "npm", "fastlane"):
         typer.echo(f"  {tool:12} {shutil.which(tool) or 'not found'}")
+    from .doctor import environment_warnings
+    from .recipes import load_recipes
+
+    warnings = environment_warnings(settings, load_recipes())
+    if warnings:
+        typer.echo("warnings:")
+        for w in warnings:
+            typer.echo(f"  ! {w}")
 
 
 @app.command()

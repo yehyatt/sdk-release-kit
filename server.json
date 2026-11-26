@@ -8,12 +8,12 @@
     "source": "github"
   },
   "websiteUrl": "https://github.com/yehyatt/sdk-release-kit",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "packages": [
     {
       "registryType": "pypi",
       "identifier": "sdk-release-kit",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "runtimeHint": "uvx",
       "packageArguments": [
         {

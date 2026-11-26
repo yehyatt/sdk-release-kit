@@ -30,6 +30,7 @@ from .builders import (
     step_label,
 )
 from .builders.android import tooling_env
+from .doctor import environment_warnings
 from .models import DESTINATIONS, Recipe, RecipesFile
 from .paths import expand
 from .recipes import RecipeError, load_recipes, substitute, variables_for
@@ -212,6 +213,8 @@ class Pipeline:
         log.info(f"staging: {staging}")
         for dest, reason in dests.items():
             log.info(f"destination {dest}: {'ready' if reason is None else 'SKIP, ' + reason}")
+        for warning in environment_warnings(self.settings, self.recipes):
+            log.info(f"WARNING: {warning}")
         if not selections:
             log.info("no SDKs selected; set checkout paths in Repositories or pass --sdks")
         for sel in selections:
@@ -297,10 +300,16 @@ class Pipeline:
                     self.log.info(f"skip {step_label(step)} ({reason})")
                     continue
                 self.log.info(f"{stage}: {step_label(step)}")
-                stage_artifacts += execute_step(ctx, step, stage)
+                produced = execute_step(ctx, step, stage)
+                if stage == "demos":
+                    # Keep each demo as soon as its step succeeds, so a later failing step
+                    # (say an iOS build after a good APK) does not throw it away.
+                    sel.artifacts += produced
+                else:
+                    stage_artifacts += produced
             if stage == "packages":
-                stage_artifacts = self._bundle_packages(sel, ctx, stage_artifacts)
-            sel.artifacts += stage_artifacts
+                # Packages ship as one bundle, so only a complete stage is kept.
+                sel.artifacts += self._bundle_packages(sel, ctx, stage_artifacts)
 
     def _upload(
         self, selections: list[Selection], active: set[str], meta: dict[str, str]
@@ -321,6 +330,13 @@ class Pipeline:
             for sel in selections:
                 files = [a for a in sel.artifacts if a.kind == kind]
                 if not files:
+                    continue
+                if sel.status != "ok":
+                    for art in files:
+                        msg = (
+                            f"{sel.recipe_id} build did not finish; store uploads need a full build"
+                        )
+                        results.append(UploadResult(dest, art.path.name, "skipped", msg))
                     continue
                 store = sel.recipe.store
                 ident = (
@@ -381,6 +397,8 @@ class Pipeline:
         active = {d for d, reason in dests.items() if reason is None}
         for dest, reason in dests.items():
             log.info(f"destination {dest}: {'ready' if reason is None else 'SKIP, ' + reason}")
+        for warning in environment_warnings(self.settings, self.recipes):
+            log.info(f"WARNING: {warning}")
 
         for sel in selections:
             log.section(f"Build {sel.recipe_id} ({opts.artifacts})")
@@ -393,13 +411,17 @@ class Pipeline:
                 self._build(sel, opts, run_dir, active)
                 sel.status = "ok"
             except (StepError, OSError, ValueError) as exc:
-                sel.status = "failed"
+                # "partial": a later step failed, but demos from earlier steps were collected.
+                # They still go to the shared folder; store uploads need a fully ok build.
+                sel.status = "partial" if sel.artifacts else "failed"
                 sel.error = log.redact(str(exc))
                 log.info(f"FAILED: {sel.error}")
+                if sel.artifacts:
+                    log.info(f"keeping {len(sel.artifacts)} artifact(s) from earlier steps")
 
         meta = {f"{s.recipe_id}.commit": s.commit for s in selections}
-        ok_selections = [s for s in selections if s.status == "ok"]
-        uploads = self._upload(ok_selections, active, meta) if active else []
+        publishable = [s for s in selections if s.status in ("ok", "partial")]
+        uploads = self._upload(publishable, active, meta) if active else []
 
         failed = [s for s in selections if s.status != "ok"] or [
             u for u in uploads if u.status == "failed"

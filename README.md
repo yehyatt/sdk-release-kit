@@ -294,6 +294,37 @@ Each real run writes `<staging>/runs/<timestamp>/` with the collected artifacts 
 Intermediate build products (derived data, archives) are kept in `<staging>/work/` between
 runs to speed up rebuilds.
 
+If a later step in a recipe's `demos` fails, the demos collected by earlier steps are kept and
+still published to the shared folder; the build is reported as `partial` and the run is not
+`ok`. Play and TestFlight only receive builds whose every step succeeded. Packages are all or
+nothing, because they ship as one bundle.
+
+## Troubleshooting
+
+`sdk-release-kit status` (and `get_status` for agents) prints warnings for the problems below,
+and every build logs them at the start.
+
+- **`no files matched 'app/build/outputs/apk/release/*.apk'` after BUILD SUCCESSFUL.** The app
+  uses product flavors, so Gradle writes to a flavored folder such as
+  `apk/demoRelease/release/`. The error lists the files that were produced; copy that folder
+  into the recipe's `collect` glob, and run the flavored task, for example:
+
+  ```yaml
+  - type: gradle
+    tasks: [assembleDemoRelease, bundleDemoRelease]
+    collect:
+      - {glob: "app/build/outputs/apk/demo/release/*.apk", kind: apk, target: android-native-current}
+      - {glob: "app/build/outputs/bundle/demoRelease/*.aab", kind: aab}
+  ```
+
+- **`Unsupported class file major version 65`.** Java 21 (Android Studio's bundled JBR) is
+  running a project whose Gradle wrapper is older than 8.5, common in older React Native demos.
+  Point Repositories > Tooling > `java_home` at a JDK 17, which builds both old and new
+  projects, or upgrade that project's wrapper.
+- **Odd Gradle cache or class-analysis errors only when an IDE agent runs the build.** Some
+  agent and IDE terminals set `GRADLE_USER_HOME` to a temporary sandbox cache. Run with
+  `GRADLE_USER_HOME="$HOME/.gradle"` or unset it.
+
 ## Contributing
 
 See [CONTRIBUTING.md](https://github.com/yehyatt/sdk-release-kit/blob/main/CONTRIBUTING.md). AI coding agents should read [AGENTS.md](https://github.com/yehyatt/sdk-release-kit/blob/main/AGENTS.md)

@@ -19,6 +19,7 @@ from mcp.types import ToolAnnotations
 from pydantic import Field
 
 from . import __version__
+from .doctor import environment_warnings
 from .models import DESTINATIONS, RepoEntry
 from .paths import expand, settings_file, user_home
 from .pipeline import Pipeline, RunOptions
@@ -106,7 +107,9 @@ def get_status() -> dict[str, Any]:
     Returns the settings directory and which settings files exist; each recipe's checkout path,
     whether it is enabled and whether the folder exists; each key as "configured" or "missing"
     (never the value); whether onedrive, play and testflight are ready or why they would be
-    skipped; and the paths of git, java, flutter, xcodebuild, pod, npm and fastlane on PATH.
+    skipped; the paths of git, java, flutter, xcodebuild, pod, npm and fastlane on PATH; and
+    warnings about the environment (a Java too new for a project's Gradle wrapper, or a
+    sandboxed GRADLE_USER_HOME) that would make builds fail in confusing ways.
     Reads local settings only and changes nothing."""
     settings = load_all()
     pipeline = Pipeline(settings=settings)
@@ -137,6 +140,7 @@ def get_status() -> dict[str, Any]:
             for t in ("git", "java", "flutter", "xcodebuild", "pod", "npm", "fastlane")
         },
         "staging": str(expand(settings.outputs.staging)),
+        "warnings": environment_warnings(settings, load_recipes()),
     }
 
 

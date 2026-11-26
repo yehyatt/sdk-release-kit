@@ -168,6 +168,35 @@ def _copy_into(src: Path, dest_dir: Path) -> Path:
     return dest
 
 
+def _nearby_hint(root: Path, pattern: str, limit: int = 8) -> str:
+    """When a collect glob misses, list files with the same extension the step did produce,
+    so a flavored path (apk/demoRelease/release/...) is obvious from the error alone."""
+    fixed: list[str] = []
+    for part in pattern.split("/"):
+        if any(ch in part for ch in "*?["):
+            break
+        fixed.append(part)
+    base = root.joinpath(*fixed) if fixed else root
+    while base != root and not base.is_dir():
+        base = base.parent
+    suffix = Path(pattern).suffix
+    if not suffix or not base.is_dir():
+        return ""
+    root_resolved = root.resolve()
+    found = sorted(
+        p.relative_to(root).as_posix()
+        for p in base.rglob(f"*{suffix}")
+        if p.is_file() and root_resolved in p.resolve().parents
+    )
+    if not found:
+        return ""
+    shown = "\n  ".join(found[:limit]) + ("\n  ..." if len(found) > limit else "")
+    return (
+        f". Found these {suffix} files instead (product flavors change the folder; "
+        f"adjust the recipe's collect glob):\n  {shown}"
+    )
+
+
 def execute_step(ctx: BuildContext, step: Any, stage: str) -> list[Artifact]:
     cwd, plan = plan_step(ctx, step)
     if not cwd.is_dir():
@@ -189,7 +218,9 @@ def execute_step(ctx: BuildContext, step: Any, stage: str) -> list[Artifact]:
         if escaped:
             raise StepError(f"'{spec.glob}' matched files outside {root}: {escaped[0]}")
         if not matches and spec.required:
-            raise StepError(f"no files matched '{spec.glob}' under {root}")
+            raise StepError(
+                f"no files matched '{spec.glob}' under {root}" + _nearby_hint(root, spec.glob)
+            )
         produced += [Produced(m, spec.kind, spec.target) for m in matches]
 
     artifacts = []
